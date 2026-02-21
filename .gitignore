@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
+credentials/*.json
+!.streamlit/secrets.example.toml
+!credentials/juizes.exemplo.json
+env/*
