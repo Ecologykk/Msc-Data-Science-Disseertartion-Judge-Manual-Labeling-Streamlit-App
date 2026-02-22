@@ -20,7 +20,7 @@ def _project_root() -> Path:
 
 def _dataset_path(branch: Ramo) -> Path:
     file_name = "dv_gold_test_full.csv" if branch == Ramo.DV else "boc_gold_test_full.csv"
-    return _project_root() / "data" / "processed_data" / "gold_test" / file_name
+    return _project_root() / "data" /  file_name
 
 
 def _validate_columns(df: pd.DataFrame, csv_path: Path) -> None:
