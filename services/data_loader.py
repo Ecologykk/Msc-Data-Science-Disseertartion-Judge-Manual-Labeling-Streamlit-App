@@ -15,7 +15,7 @@ REQUIRED_COLUMNS = [
 
 
 def _project_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[1]
 
 
 def _dataset_path(branch: Ramo) -> Path:
