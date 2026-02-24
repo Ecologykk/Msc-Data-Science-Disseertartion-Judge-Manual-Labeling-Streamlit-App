@@ -1,7 +1,6 @@
 ﻿from __future__ import annotations
 
 import time
-import base64
 from pathlib import Path
 
 import streamlit as st
@@ -12,7 +11,11 @@ from services.assignment import assign_branch, build_fixed_case_order
 from services.auth import load_credentials, verify_login
 from services.data_loader import load_cases
 from services.persistence import GSheetsPersistence, PersistenceError, now_timestamp
-from services.progress import compute_progress, first_incomplete_index
+from services.progress import (
+    compute_progress,
+    first_incomplete_index,
+    is_response_complete,
+)
 from ui import (
     load_css,
     render_case_block,
@@ -93,6 +96,7 @@ def _cases_by_branch(branch: Ramo):
     return cases, {case.n_processo: case for case in cases}
 
 
+@st.cache_resource(show_spinner=False)
 def _get_store(branch: Ramo) -> GSheetsPersistence:
     return GSheetsPersistence(branch)
 
@@ -127,38 +131,7 @@ def _scroll_to_top() -> None:
 
 
 def _render_footer_logos() -> None:
-    st.markdown("---")
-    logo_tags: list[str] = []
-
-    if LOGO_FCUL_PATH:
-        fcul_base64 = base64.b64encode(LOGO_FCUL_PATH.read_bytes()).decode("ascii")
-        logo_tags.append(
-            "<img "
-            f"src='data:image/png;base64,{fcul_base64}' "
-            "alt='Logo Faculdade de Ciências da Universidade de Lisboa' "
-            "style='max-width:260px; width:100%; height:auto; object-fit:contain;' />"
-        )
-
-    if LOGO_CSM_PATH:
-        csm_mime = "image/png" if LOGO_CSM_PATH.suffix.lower() == ".png" else "image/jpeg"
-        csm_base64 = base64.b64encode(LOGO_CSM_PATH.read_bytes()).decode("ascii")
-        logo_tags.append(
-            "<img "
-            f"src='data:{csm_mime};base64,{csm_base64}' "
-            "alt='Logo Conselho Superior da Magistratura' "
-            "style='max-width:260px; width:100%; height:auto; object-fit:contain;' />"
-        )
-
-    if logo_tags:
-        st.markdown(
-            (
-                "<div style='display:flex; justify-content:space-between; "
-                "align-items:flex-end; gap:1rem; width:100%;'>"
-                + "".join(logo_tags)
-                + "</div>"
-            ),
-            unsafe_allow_html=True,
-        )
+    return
 
 
 def _pending_case_positions(
@@ -168,9 +141,7 @@ def _pending_case_positions(
     pending: list[int] = []
     for idx, case_id in enumerate(ordered_case_ids, start=1):
         response = responses.get(case_id, {})
-        has_decision = bool(str(response.get("decisao", "")).strip())
-        has_confidence = bool(str(response.get("confianca", "")).strip())
-        if not (has_decision and has_confidence):
+        if not is_response_complete(response):
             pending.append(idx)
     return pending
 
@@ -190,9 +161,7 @@ def _render_case_status_indicator(
             classes.append("pending")
         else:
             classes.append("done")
-        dots.append(
-            f"<span class='{' '.join(classes)}' title='Caso {pos}'></span>"
-        )
+        dots.append(f"<span class='{' '.join(classes)}' title='Caso {pos}'></span>")
 
     st.markdown(
         "<div class='case-status-strip'>" + "".join(dots) + "</div>",
@@ -296,7 +265,9 @@ def _initialize_user_runtime(username: str, branch: Ramo) -> None:
     st.session_state["branch"] = branch.value
     st.session_state["responses"] = responses
     st.session_state["ordered_case_ids"] = ordered_case_ids
-    st.session_state["current_index"] = first_incomplete_index(ordered_case_ids, responses)
+    st.session_state["current_index"] = first_incomplete_index(
+        ordered_case_ids, responses
+    )
     st.session_state["dirty"] = False
     st.session_state["last_mutation_epoch"] = 0.0
     st.session_state["last_saved_epoch"] = time.time()
@@ -304,7 +275,9 @@ def _initialize_user_runtime(username: str, branch: Ramo) -> None:
     st.session_state["last_save_kind"] = "info"
     st.session_state["finalized"] = bool(state.get("finalizado", False))
     st.session_state["finalized_at"] = str(state.get("finalizado_em", "")).strip()
-    st.session_state["page"] = PAGE_FINAL if st.session_state["finalized"] else PAGE_INSTRUCOES
+    st.session_state["page"] = (
+        PAGE_FINAL if st.session_state["finalized"] else PAGE_INSTRUCOES
+    )
 
 
 def _render_login_page() -> None:
@@ -366,9 +339,9 @@ def _render_instruction_page() -> None:
             "1. Leia o caso com atenção.\n"
             "2. Selecione a classe de desfecho adequada.\n"
             "3. Indique o grau de confiança da sua classificação.\n"
-            "4. Escreva uma justificação, se necessário.\n"
-            "5. Grave o progresso e avance para o caso seguinte.\n\n"
-            "### Quando selecionar \"Não Confiante\"\n"
+            "4. Escreva uma justificação breve (obrigatória em caso de baixa confiança).\n"
+            "5. Guarde o progresso e avance para o próximo caso.\n\n"
+            '### Quando usar **"Não Confiante"**?\n'
             "- Quando o caso estiver no limite entre duas classes possíveis.\n"
             "- Quando a fundamentação for ambígua ou insuficiente para uma classificação segura.\n"
             "- Quando existirem dúvidas significativas sobre a adequação da classe escolhida."
@@ -422,9 +395,6 @@ def _render_annotation_page() -> None:
         "Analise cada caso e escolha a opção pretendida.",
     )
     st.progress(progress, text=f"{answered} de {total} casos concluídos.")
-    st.info(
-        "Nota operacional: para garantir o registo visual da escolha, clique duas vezes no botão pretendido."
-    )
 
     if st.button("Ver resumo rápido das instruções", use_container_width=True):
         st.session_state["show_instructions_summary"] = not st.session_state.get(
@@ -432,7 +402,7 @@ def _render_annotation_page() -> None:
         )
     if st.session_state.get("show_instructions_summary", False):
         st.info(
-            "Resumo: leia o caso, selecione a classe, indique confiança, justifique se necessário e grave o progresso. Use 'Não Confiante' em casos-limite, ambíguos ou com dúvida relevante."
+            "Resumo: leia o caso, selecione a classe, indique confiança, justifique (obrigatório em baixa confiança), guarde o progresso e avance para o próximo caso. Use 'Não Confiante' em casos-limite, ambíguos ou com dúvida relevante."
         )
 
     current_index = min(st.session_state["current_index"], len(ordered_case_ids) - 1)
@@ -480,6 +450,7 @@ def _render_annotation_page() -> None:
     )
     if new_decision != current_response.get("decisao", ""):
         _update_response(current_case_id, "decisao", new_decision)
+        st.rerun()
 
     new_confidence = render_choice_buttons(
         "Grau de confiança",
@@ -489,19 +460,25 @@ def _render_annotation_page() -> None:
     )
     if new_confidence != current_response.get("confianca", ""):
         _update_response(current_case_id, "confianca", new_confidence)
+        st.rerun()
 
-    st.markdown("### Justificação (opcional)")
+    st.markdown("### Justificação")
     justification_key = f"justificacao_{current_case_id}"
     if justification_key not in st.session_state:
         st.session_state[justification_key] = current_response.get("justificacao", "")
     justification_text = st.text_area(
-        "Introduza a justificação, se necessário.",
+        "Introduza a justificação (obrigatória em caso de baixa confiança).",
         key=justification_key,
         height=160,
         label_visibility="collapsed",
     )
     if justification_text != current_response.get("justificacao", ""):
         _update_response(current_case_id, "justificacao", justification_text)
+    if (
+        str(current_response.get("confianca", "")).strip() == "Não Confiante"
+        and not str(current_response.get("justificacao", "")).strip()
+    ):
+        st.warning("A justificação é obrigatória quando selecionar 'Não Confiante'.")
 
     render_save_feedback(
         st.session_state.get("last_save_message", ""),
@@ -532,7 +509,6 @@ def _render_annotation_page() -> None:
             st.session_state["scroll_to_top_pending"] = True
             st.rerun()
 
-    answered, total, progress = compute_progress(ordered_case_ids, responses)
     if answered == total:
         st.warning(
             "Todos os casos foram preenchidos. Se estiver concluído, finalize para bloquear a anotação."
@@ -608,4 +584,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

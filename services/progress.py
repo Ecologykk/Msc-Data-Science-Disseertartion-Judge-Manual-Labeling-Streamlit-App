@@ -1,6 +1,18 @@
 from __future__ import annotations
 
 
+def is_response_complete(response: dict[str, str]) -> bool:
+    decisao = str(response.get("decisao", "")).strip()
+    confianca = str(response.get("confianca", "")).strip()
+    justificacao = str(response.get("justificacao", "")).strip()
+
+    if not (decisao and confianca):
+        return False
+    if confianca == "Não Confiante" and not justificacao:
+        return False
+    return True
+
+
 def compute_progress(
     case_ids: list[str],
     responses: dict[str, dict[str, str]],
@@ -12,9 +24,7 @@ def compute_progress(
     answered = 0
     for case_id in case_ids:
         response = responses.get(case_id, {})
-        has_decision = bool(str(response.get("decisao", "")).strip())
-        has_confidence = bool(str(response.get("confianca", "")).strip())
-        if has_decision and has_confidence:
+        if is_response_complete(response):
             answered += 1
 
     progress = answered / total
@@ -27,8 +37,6 @@ def first_incomplete_index(
 ) -> int:
     for index, case_id in enumerate(ordered_case_ids):
         response = responses.get(case_id, {})
-        has_decision = bool(str(response.get("decisao", "")).strip())
-        has_confidence = bool(str(response.get("confianca", "")).strip())
-        if not (has_decision and has_confidence):
+        if not is_response_complete(response):
             return index
     return 0
