@@ -67,6 +67,11 @@ def render_choice_buttons(
     selected: str,
     key_prefix: str,
 ) -> str:
+    pending_key = f"{key_prefix}_pending_selection"
+    pending_selection = st.session_state.pop(pending_key, None)
+    if pending_selection is not None:
+        selected = str(pending_selection)
+
     st.markdown(f"### {title}")
     if selected:
         st.success(f"Selecionado: {selected}")
@@ -84,6 +89,9 @@ def render_choice_buttons(
             type=button_type,
         ):
             new_value = option
+            if option != selected:
+                st.session_state[pending_key] = option
+                st.rerun()
     return new_value
 
 
