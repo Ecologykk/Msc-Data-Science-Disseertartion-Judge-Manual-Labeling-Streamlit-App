@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from models import Caso, Ramo
+from models import Caso, Ramo, NomeFicheiro
 
 
 REQUIRED_COLUMNS = [
@@ -19,8 +19,8 @@ def _project_root() -> Path:
 
 
 def _dataset_path(branch: Ramo) -> Path:
-    file_name = "dv_gold_test_full.csv" if branch == Ramo.DV else "boc_gold_test_full.csv"
-    return _project_root() / "data" /  file_name
+    file_name = NomeFicheiro.DV.value if branch == Ramo.DV else NomeFicheiro.BOC.value
+    return _project_root() / "data" / file_name
 
 
 def _validate_columns(df: pd.DataFrame, csv_path: Path) -> None:
