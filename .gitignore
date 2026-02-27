@@ -5,3 +5,5 @@ credentials/*.json
 !.streamlit/secrets.example.toml
 !credentials/juizes.exemplo.json
 env/*
+.venv/*
+venv/*

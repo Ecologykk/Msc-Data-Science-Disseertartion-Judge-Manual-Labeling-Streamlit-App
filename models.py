@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from enum import Enum
 
 
+class NomeFicheiro(str, Enum):
+    BOC = "boc_5_sample.csv"
+    DV = "dv_5_sample.csv"
+
+
 class Ramo(str, Enum):
     DV = "DV"
     IC = "IC"
