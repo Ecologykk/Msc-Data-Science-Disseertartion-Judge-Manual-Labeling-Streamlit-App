@@ -336,7 +336,7 @@ def _render_instruction_page() -> None:
             "Esta plataforma destina-se à anotação manual de decisões judiciais.\n\n"
             f"**Ramo atribuído nesta sessão:** {branch_label}.\n\n"
             "### Fluxo de Trabalho por Caso\n"
-            "1. Leia o caso com atenção.\n"
+            "1. Leia o caso com atenção, particularmente o **Dispositivo/Decisão final**.\n"
             "2. Selecione a classe de desfecho adequada.\n"
             "3. Indique o grau de confiança da sua classificação.\n"
             "4. Escreva uma justificação breve (obrigatória em caso de baixa confiança).\n"
